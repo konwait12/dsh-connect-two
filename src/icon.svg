@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Connect Hub">
+  <defs>
+    <linearGradient id="hubGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#12b981"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#hubGrad)"/>
+  <g fill="none" stroke="#ffffff" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="64" cy="64" r="13" stroke-width="7"/>
+    <circle cx="34" cy="34" r="9" stroke-width="6" fill="#ffffff" fill-opacity="0.9" stroke="none"/>
+    <circle cx="94" cy="34" r="9" stroke-width="6" fill="#ffffff" fill-opacity="0.9" stroke="none"/>
+    <circle cx="34" cy="94" r="9" stroke-width="6" fill="#ffffff" fill-opacity="0.9" stroke="none"/>
+    <circle cx="94" cy="94" r="9" stroke-width="6" fill="#ffffff" fill-opacity="0.9" stroke="none"/>
+    <path d="M41 41 L53 53 M87 41 L75 53 M41 87 L53 75 M87 87 L75 75" stroke-width="6"/>
+  </g>
+  <path d="M57 64 l5 5 l10 -11" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

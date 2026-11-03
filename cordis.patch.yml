@@ -1,0 +1,11 @@
+# Register the Hub panel. The two provider plugins stay installed and untouched:
+# the Hub only reads their read-only routes and calls their explicit check-in
+# write route. Removing this bundle never affects either provider.
+- insert:
+    - id: dsh-connect-two
+      name: dsh-connect-two
+      config:
+        autoCheckin:
+          enabled: false
+          time: '09:00'
+          catchUp: false

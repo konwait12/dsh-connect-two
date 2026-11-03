@@ -1,0 +1,11 @@
+node_modules/
+*.tgz
+.DS_Store
+
+# Local scratch
+/05_临时缓存回收站/
+*.log
+
+# Private measurement log: contains this machine's own account balances and
+# streak figures. It lives in the private Obsidian vault instead.
+docs/实测记录.md

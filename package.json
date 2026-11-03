@@ -1,0 +1,65 @@
+{
+  "name": "dsh-connect-two",
+  "version": "0.1.0",
+  "description": "One panel for the credits and daily check-in of locally signed-in Trae and WorkBuddy accounts, with an opt-in daily automatic check-in.",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "main": "./src/index.js",
+  "exports": {
+    ".": "./src/index.js",
+    "./client": "./src/client.js",
+    "./locale/*.json": "./src/locale/*.json",
+    "./icon": "./src/icon.svg",
+    "./cordis.patch.yml": "./src/cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src/index.js",
+    "src/client.js",
+    "src/cordis.patch.yml",
+    "src/locale/*.json",
+    "src/icon.svg",
+    "LICENSE",
+    "README.md"
+  ],
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "trae",
+    "workbuddy",
+    "credits",
+    "check-in",
+    "checkin"
+  ],
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./src/cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-client-ui-settings-plugins",
+        "@deepseek-ai/dsh-client-locale"
+      ]
+    }
+  },
+  "scripts": {
+    "test": "node --test test/hub.test.js test/host-harness.test.js",
+    "check": "node --check src/index.js && node --check src/client.js && npm test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/konwait12/dsh-connect-two.git"
+  },
+  "bugs": {
+    "url": "https://github.com/konwait12/dsh-connect-two/issues"
+  },
+  "homepage": "https://github.com/konwait12/dsh-connect-two#readme"
+}
