@@ -1,6 +1,6 @@
 {
   "name": "dsh-connect-two",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "One panel for the credits and daily check-in of locally signed-in Trae and WorkBuddy accounts, with an opt-in daily automatic check-in.",
   "type": "module",
   "license": "MIT",

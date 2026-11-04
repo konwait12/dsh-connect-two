@@ -294,3 +294,62 @@ test('an all-failed automatic run does NOT burn the day, so it can retry', async
   assert.equal(last.failed, 1)
   harness.disposeAll()
 })
+
+test('a torn state file must not reset the user config to defaults', async (t) => {
+  // Regression for the reported "the auto check-in switch turns itself off when
+  // I restart dsh". `writeFile` truncates before it writes, so a read that lands
+  // mid-write sees an empty or partial document. The old reader answered
+  // "unreadable" with DEFAULTS — enabled: false — which looked exactly like the
+  // user never turned it on.
+  const { dir, origin } = await scenario(t, () => ({ payload: TRAE_USAGE }))
+  const { apply } = await import('../src/index.js')
+  const { mkdir, writeFile } = await import('node:fs/promises')
+
+  const stateDir = join(dir, STATE_DIR)
+  await mkdir(stateDir, { recursive: true })
+  // A truncated document: what a reader sees while another writer is mid-flight.
+  await writeFile(join(stateDir, 'state.json'), '{"version":1,"config":{"autoCheckin":{"enabled":tr', 'utf8')
+
+  const harness = fakeContext(origin)
+  const errors = []
+  harness.ctx.logger = { info: () => {}, error: (m) => errors.push(m) }
+  apply(harness.ctx, { autoCheckin: { enabled: true, time: '07:45' } })
+  await new Promise((resolve) => setTimeout(resolve, 90))
+
+  const overview = fakeResponse()
+  await harness.routes.get(HUB_OVERVIEW_PATH)({ method: 'GET', headers: {} }, overview)
+  const body = JSON.parse(overview.state.body)
+
+  // The damaged file is reported...
+  assert.ok(typeof body.stateError === 'string' && body.stateError.includes('not valid JSON'), 'a corrupt file must be reported')
+  assert.equal(errors.length > 0, true, 'the failure must be logged, not swallowed')
+  // ...and the configured schedule is NOT silently replaced by defaults.
+  assert.equal(body.config.autoCheckin.time, '07:45', 'row config must survive a corrupt state file')
+  harness.disposeAll()
+})
+
+test('concurrent writes never expose a truncated state file', async (t) => {
+  // Atomic replacement is what makes the restart race harmless.
+  const { dir } = await scenario(t, () => ({ payload: TRAE_USAGE }))
+  const { writeState } = await import('../src/index.js')
+  const { readFile } = await import('node:fs/promises')
+
+  const statePath = join(dir, STATE_DIR, 'state.json')
+  const big = { version: 1, config: { autoCheckin: { enabled: true, time: '09:00', catchUp: false }, targets: ['trae'] }, history: Array.from({ length: 60 }, (_, i) => ({ at: i, trigger: 'manual', results: [] })) }
+
+  let torn = 0
+  for (let i = 0; i < 120; i++) {
+    await Promise.all([
+      writeState(big),
+      (async () => {
+        try {
+          const text = await readFile(statePath, 'utf8')
+          JSON.parse(text)
+        } catch (error) {
+          if (error.code !== 'ENOENT') torn++
+        }
+      })(),
+    ])
+  }
+  assert.equal(torn, 0, 'a concurrent reader must always see a complete document')
+})

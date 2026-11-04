@@ -16,9 +16,9 @@
  * is created there and neither sibling's config is touched.
  */
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 
 export const name = 'dsh-connect-two'
 
@@ -89,9 +89,25 @@ function normalizeConfig(raw) {
   }
 }
 
+/**
+ * Read the stored state.
+ *
+ * "No file yet" and "the file is unreadable" are DIFFERENT answers and must not
+ * share one branch. Returning defaults for a torn or partially-written file is
+ * what silently turned the automatic check-in off on restart: a plain
+ * `writeFile` truncates first, so any concurrent read — a restart racing a route
+ * hit — can observe an empty or half-written document, and that parse failure
+ * used to masquerade as "never configured".
+ */
 async function readState() {
+  let text
   try {
-    const text = await readFile(statePath(), 'utf8')
+    text = await readFile(statePath(), 'utf8')
+  } catch (error) {
+    if (error?.code === 'ENOENT') return emptyState()
+    throw error
+  }
+  try {
     const parsed = JSON.parse(text)
     return {
       version: 1,
@@ -100,14 +116,34 @@ async function readState() {
       lastRunDay: typeof parsed.lastRunDay === 'string' ? parsed.lastRunDay : undefined,
     }
   } catch {
-    return { version: 1, config: normalizeConfig(DEFAULTS), history: [], lastRunDay: undefined }
+    // A parse failure is NOT "empty state": say so loudly and let the caller keep
+    // its in-memory copy instead of replacing the user's settings with defaults.
+    const error = new Error(`state file is not valid JSON: ${statePath()}`)
+    error.code = 'E_STATE_CORRUPT'
+    error.raw = text.slice(0, 200)
+    throw error
   }
 }
 
-async function writeState(state) {
+function emptyState() {
+  return { version: 1, config: normalizeConfig(DEFAULTS), history: [], lastRunDay: undefined }
+}
+
+/**
+ * Replace the state file atomically.
+ *
+ * Write a sibling file, then `rename` over the target: rename within one
+ * directory is atomic on POSIX and NTFS, so a concurrent reader sees either the
+ * whole old document or the whole new one — never a truncated middle. Without
+ * this, a read during a write parsed as garbage and reset the user's config.
+ */
+export async function writeState(state) {
   const path = statePath()
   await mkdir(dirname(path), { recursive: true })
-  await writeFile(path, JSON.stringify({ ...state, history: state.history.slice(-200) }, null, 2), 'utf8')
+  const body = JSON.stringify({ ...state, history: state.history.slice(-200) }, null, 2)
+  const temp = join(dirname(path), `.${basename(path)}.${process.pid}.${Date.now()}.tmp`)
+  await writeFile(temp, body, 'utf8')
+  await rename(temp, path)
 }
 
 // ---------------------------------------------------------------------------
@@ -366,10 +402,20 @@ export function apply(ctx, config) {
   const initial = normalizeConfig(config)
   let state = { version: 1, config: initial, history: [], lastRunDay: undefined }
   let loaded = false
+  /** Set when the file exists but cannot be parsed; surfaced, never silently reset. */
+  let stateError
 
   const load = async () => {
     if (loaded) return
-    state = await readState()
+    try {
+      state = await readState()
+    } catch (error) {
+      // Keep the row config in memory rather than replacing it with defaults, and
+      // never overwrite the damaged file: the user's schedule may still be
+      // recoverable by hand, and a later save would destroy the evidence.
+      stateError = error instanceof Error ? error.message : String(error)
+      ctx.logger?.error?.(`[dsh-connect-two] ${stateError} — keeping the configured defaults and NOT rewriting the file`)
+    }
     loaded = true
   }
 
@@ -446,6 +492,9 @@ export function apply(ctx, config) {
               config: state.config,
               lastRunDay: state.lastRunDay,
               scheduler: scheduler?.status() ?? { armed: false, nextAt: null, enabled: false, time: null },
+              // A damaged state file must be visible in the panel, not inferred
+              // from a schedule that silently stopped being armed.
+              ...(stateError === undefined ? {} : { stateError }),
               history: state.history.slice(-20),
             })
           } catch (error) {
